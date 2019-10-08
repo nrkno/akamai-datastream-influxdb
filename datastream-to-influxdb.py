@@ -74,7 +74,7 @@ def get_metrics(log ,start, end, session, influx_client, datastream_url, hostnam
         try:
             data = result.json()
         except Exception as e:
-            log.error("Error getting datastream data")
+            log.error("Error getting datastream data {}".format(e), exc_info=True)
             return
         for entry in data['data']:
             m = {}
@@ -91,7 +91,7 @@ def get_metrics(log ,start, end, session, influx_client, datastream_url, hostnam
                 log.error("Error writing to influxdb")
                 return
         except Exception as e:
-            log.error("Error writing to influxdb: {}".format(e))
+            log.error("Error writing to influxdb: {}".format(e), exc_info=True)
             return
         page += 1
         if page >= data['metadata']['pageCount']:
