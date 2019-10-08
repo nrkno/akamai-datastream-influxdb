@@ -1,0 +1,4 @@
+structlog ~= 18.0
+influxdb ~= 5.2
+requests ~= 2.22
+edgegrid-python ~= 1.1

@@ -1,0 +1,92 @@
+---
+apiVersion: v1
+data:
+  access_token: XX
+  base_url: XX
+  client_secret: XX 
+  client_token: XX
+  influxdb_database: XX
+  influxdb_password: XX
+  influxdb_username: XX
+kind: Secret
+metadata:
+  name: akamai-datastream-influxdb
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: akamai-datastream-influxdb
+  labels:
+    app: akamai-datastream-influxdb
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: akamai-datastream-influxdb
+  template:
+
+    metadata:
+      labels:
+        app: akamai-datastream-influxdb
+    spec:
+      containers:
+      - name: akamai-datastream-influxdb
+        env:
+          - name: BASE_URL
+            valueFrom:
+              secretKeyRef:
+                key: base_url
+                name: akamai-datastream-influxdb
+          - name: ACCESS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: access_token
+                name: akamai-datastream-influxdb
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                key: client_secret
+                name: akamai-datastream-influxdb
+          - name: CLIENT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                key: client_token
+                name: akamai-datastream-influxdb
+          - name: INFLUXDB_DATABASE
+            valueFrom:
+              secretKeyRef:
+                key: influxdb_database
+                name: akamai-datastream-influxdb
+          - name: INFLUXDB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                key: influxdb_username
+                name: akamai-datastream-influxdb
+          - name: INFLUXDB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: influxdb_password
+                name: akamai-datastream-influxdb
+          - name: INFLUXDB_HOST
+            value: influxdb.example.com
+          - name: STREAMS
+            value: "123=host1.example.com,234=host2.example.com"
+        image: DOCKER_IMAGE_PATH
+        resources:
+          limits:
+            cpu: 150m
+            memory: 512Mi
+          requests:
+            cpu: 50m
+            memory: 256Mi
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+      restartPolicy: Always
