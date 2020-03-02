@@ -3,7 +3,9 @@ FROM ubuntu:18.04 as base
 RUN apt-get update && \
     apt-get install -y dumb-init python3 python3-distutils && \
     groupadd -g 1000 datastream && \
-    useradd -u 1000 -g 1000 -m datastream
+    useradd -u 1000 -g 1000 -m datastream && \
+    apt-get clean -y && \
+    find /var/lib/apt/lists -type f -delete
 
 FROM base as build
 
@@ -25,9 +27,6 @@ FROM base as prod
 
 ENV LC_ALL C.UTF-8
 ENV PYTHONUNBUFFERED 1
-
-RUN apt-get clean -y && \
-    find /var/lib/apt/lists -type f -delete
 
 USER 1000
 
