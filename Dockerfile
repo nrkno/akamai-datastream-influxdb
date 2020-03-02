@@ -1,7 +1,5 @@
 FROM ubuntu:18.04 as base
 
-COPY requirements.txt /
-
 RUN apt-get update && \
     apt-get install -y dumb-init python3 python3-distutils && \
     groupadd -g 1000 datastream && \
@@ -16,28 +14,29 @@ WORKDIR /opt/datastream
 
 RUN chown datastream:datastream /opt/datastream
 
+USER 1000
 RUN pip3 install --user pipenv
-
 ENV LC_ALL C.UTF-8
 ENV LANG C.UTF-8
-
 COPY Pipfile Pipfile.lock /opt/datastream/
-RUN  /home/datastream/.local/bin/pipenv install
+RUN /home/datastream/.local/bin/pipenv install
 
 FROM base as prod
 
-USER 1000
+ENV LC_ALL C.UTF-8
 ENV PYTHONUNBUFFERED 1
-
-WORKDIR /opt/datastream
 
 RUN apt-get clean -y && \
     find /var/lib/apt/lists -type f -delete
 
+USER 1000
+
+WORKDIR /opt/datastream
+
 COPY --from=build /opt/datastream /opt/datastream
 COPY --from=build /home/datastream/ /home/datastream/
-COPY datastream-to-influxdb.py /opt/mknamespace
+COPY datastream-to-influxdb.py /opt/datastream
 
 USER 1000
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/opt/datastream/datastream-to-influxdb.py"]
+CMD ["/home/datastream/.local/bin/pipenv run /opt/datastream/datastream-to-influxdb.py"]
