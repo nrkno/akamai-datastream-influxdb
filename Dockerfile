@@ -38,4 +38,4 @@ COPY datastream-to-influxdb.py /opt/datastream
 
 USER 1000
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["/home/datastream/.local/bin/pipenv run /opt/datastream/datastream-to-influxdb.py"]
+CMD ["/home/datastream/.local/bin/pipenv", "run", "/opt/datastream/datastream-to-influxdb.py"]
