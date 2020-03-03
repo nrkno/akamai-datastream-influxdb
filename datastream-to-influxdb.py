@@ -64,7 +64,9 @@ def get_log():
     return log
 
 
-def get_metrics(log, start, end, session, influx_client, datastream_url, hostname):
+def get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries = 1):
+    if retries <= 0:
+        return
     metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
     influxdb_data = []
     page = 0
@@ -76,10 +78,10 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
-            return
+            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         if not result.ok:
             log.error("Error getting datastream data: {}".format(result.text))
-            return
+            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         try:
             data = result.json()
         except Exception as e:
