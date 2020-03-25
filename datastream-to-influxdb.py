@@ -74,7 +74,7 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
     while not done:
         try:
             result = session.get(datastream_url, params={
-                'start': start, 'end': end, 'page': page, 'size': 2000, 'aggregateMetric': metrics})
+                'start': start, 'end': end, 'page': page, 'size': 1000, 'aggregateMetric': metrics})
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
