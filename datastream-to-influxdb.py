@@ -89,7 +89,7 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
-            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, 0)
+            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         for entry in data['data']:
             m = {}
             m['tags'] = {'hostname': hostname}
