@@ -64,7 +64,7 @@ def get_log():
     return log
 
 
-def get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries = 1):
+def get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries=2):
     if retries <= 0:
         return
     metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
@@ -78,16 +78,18 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
+            time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         if not result.ok:
             log.error("Error getting datastream data: {}".format(result.text))
+            time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         try:
             data = result.json()
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
-            return
+            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, 0)
         for entry in data['data']:
             m = {}
             m['tags'] = {'hostname': hostname}
@@ -142,8 +144,8 @@ def get_datastreams():
 
 
 def main(log, session, influx_client):
-    start = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
-    end = datetime.datetime.utcnow()
+    start = datetime.datetime.utcnow() - datetime.timedelta(minutes=2)
+    end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
     while True:
         start_time = start.strftime("%Y-%m-%dT%H:%M:%SZ")
         end_time = end.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -154,10 +156,10 @@ def main(log, session, influx_client):
                         session, influx_client,
                         datastream_url, hostname)
         start = end
-        end = datetime.datetime.utcnow()
-        if((end - start) < datetime.timedelta(minutes=1)):
-            time.sleep(60 - (end-start).seconds)
-            end = datetime.datetime.utcnow()
+        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
+        if(end < start):
+            time.sleep(60)
+        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
 
 
 if __name__ == "__main__":
