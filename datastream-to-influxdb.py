@@ -158,7 +158,9 @@ def main(log, session, influx_client):
         start = end
         end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
         if(end < start):
-            time.sleep(60)
+            time.sleep(60 + (start-end).seconds)
+        elif((end-start).seconds < 60):
+            time.sleep(60-(end-start).seconds)
         end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
 
 
