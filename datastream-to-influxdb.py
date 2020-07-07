@@ -80,7 +80,13 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
                 e), exc_info=True)
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        if result.status_code == 200:
+        if result.status_code == 204:
+            done = True
+        elif result.status_code != 200:
+            log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
+            time.sleep(1)
+            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
+        else:
             try:
                 data = result.json()
             except Exception as e:
@@ -103,14 +109,9 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
             except Exception as e:
                 log.error("Error writing to influxdb: {}".format(e), exc_info=True)
                 return
-        elif result.status_code != 204:
-            log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
-            time.sleep(1)
-            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-
-        page += 1
-        if page >= data['metadata']['pageCount']:
-            done = True
+            page += 1
+            if page >= data['metadata']['pageCount']:
+                done = True
 
 
 def setup():
