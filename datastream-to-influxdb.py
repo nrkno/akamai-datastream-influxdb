@@ -81,14 +81,13 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         if not result.ok:
-            log.error("Error getting datastream data: {}".format(result.text))
+            log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         try:
             data = result.json()
         except Exception as e:
-            log.error("Error getting datastream data {}".format(
-                e), exc_info=True)
+            log.error("Error decoding json data, got '{}'".format(result.text))
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         for entry in data['data']:
             m = {}
