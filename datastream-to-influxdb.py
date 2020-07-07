@@ -80,34 +80,34 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
                 e), exc_info=True)
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        if result.status_code == 204:
-            continue
-        elif result.status_code != 200:
+        if result.status_code == 200:
+            try:
+                data = result.json()
+            except Exception as e:
+                log.error("Error decoding json data, status code {}, got '{}'".format(result.status_code, result.text))
+                return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
+            for entry in data['data']:
+                m = {}
+                m['tags'] = {'hostname': hostname}
+                m['measurement'] = 'aggregate'
+                m['time'] = entry['startTime']
+                m['fields'] = {}
+                for measurement in metrics.split(','):
+                    if measurement in entry:
+                        m['fields'][measurement] = entry[measurement]
+                influxdb_data.append(m)
+            try:
+                if not influx_client.write_points(influxdb_data):
+                    log.error("Error writing to influxdb")
+                    return
+            except Exception as e:
+                log.error("Error writing to influxdb: {}".format(e), exc_info=True)
+                return
+        elif result.status_code != 204:
             log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        try:
-            data = result.json()
-        except Exception as e:
-            log.error("Error decoding json data, status code {}, got '{}'".format(result.status_code, result.text))
-            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        for entry in data['data']:
-            m = {}
-            m['tags'] = {'hostname': hostname}
-            m['measurement'] = 'aggregate'
-            m['time'] = entry['startTime']
-            m['fields'] = {}
-            for measurement in metrics.split(','):
-                if measurement in entry:
-                    m['fields'][measurement] = entry[measurement]
-            influxdb_data.append(m)
-        try:
-            if not influx_client.write_points(influxdb_data):
-                log.error("Error writing to influxdb")
-                return
-        except Exception as e:
-            log.error("Error writing to influxdb: {}".format(e), exc_info=True)
-            return
+
         page += 1
         if page >= data['metadata']['pageCount']:
             done = True
