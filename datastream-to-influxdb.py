@@ -80,7 +80,9 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
                 e), exc_info=True)
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        if not result.ok:
+        if result.status_code == 204:
+            continue
+        elif result.status_code != 200:
             log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
             time.sleep(1)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
