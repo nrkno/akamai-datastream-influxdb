@@ -158,12 +158,12 @@ def main(log, session, influx_client):
                         session, influx_client,
                         datastream_url, hostname)
         start = end
-        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
+        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
         if(end < start):
-            time.sleep(60 + (start-end).seconds)
-        elif((end-start).seconds < 60):
-            time.sleep(60-(end-start).seconds)
-        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
+            time.sleep(300 + (start-end).seconds)
+        elif((end-start).seconds < 300):
+            time.sleep(300-(end-start).seconds)
+        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
 
 
 if __name__ == "__main__":
