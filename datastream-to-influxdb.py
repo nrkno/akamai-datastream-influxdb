@@ -70,18 +70,24 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
     metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
     influxdb_data = []
     page = 0
+    page_size = os.environ.get('PAGE_SIZE', 1000)
     done = False
     while not done:
         try:
             result = session.get(datastream_url, params={
-                'start': start, 'end': end, 'page': page, 'size': 1000, 'aggregateMetric': metrics})
+                'start': start, 'end': end, 'page': page, 'size': page_size, 'aggregateMetric': metrics})
         except Exception as e:
             log.error("Error getting datastream data {}".format(
                 e), exc_info=True)
             time.sleep((3 - retries) ** 2 * 5)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         if result.status_code == 204:
-            done = True
+            log.info("Got 204 no content for {}".format(hostname))
+            if os.environ.get('RETRY_204', None) is None:
+                done = True
+            else:
+                time.sleep((3 - retries) ** 2 * 5)
+                return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         elif result.status_code != 200:
             log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
             time.sleep((3 - retries) ** 2 * 5)
