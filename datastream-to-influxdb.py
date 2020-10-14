@@ -71,6 +71,7 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
     influxdb_data = []
     page = 0
     page_size = os.environ.get('PAGE_SIZE', 1000)
+    retry_no_content = os.environ.get('RETRY_204') is not None
     done = False
     while not done:
         try:
@@ -82,8 +83,8 @@ def get_metrics(log, start, end, session, influx_client, datastream_url, hostnam
             time.sleep((3 - retries) ** 2 * 5)
             return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
         if result.status_code == 204:
-            log.info("Got 204 no content for {}".format(hostname))
-            if os.environ.get('RETRY_204', None) is None:
+            log.info("Got 204 no content for %s", hostname)
+            if retry_no_content:
                 done = True
             else:
                 time.sleep((3 - retries) ** 2 * 5)
