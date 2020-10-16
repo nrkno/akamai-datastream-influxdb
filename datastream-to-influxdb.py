@@ -128,13 +128,13 @@ class DataStream:
                     'aggregateMetric': metrics
                     }
                 self.log.debug("Fetching data", datastream_url=self.datastream_url, params=fetch_parameters, hostname=self.hostname)
-                result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=30)
+                result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=42)
             except Exception as e:
                 self.log.error("Error getting datastream data %s", e, exc_info=True, hostname=self.hostname)
                 self._update_retries()
                 return
             if result.status_code == 204:
-                self.log.info("Got 204 no content", hostname=self.hostname)
+                self.log.info("Got 204 no content", body=result.text, hostname=self.hostname)
                 if self.retry_no_content:
                     self._update_retries()
                     return
