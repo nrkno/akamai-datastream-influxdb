@@ -1,4 +1,4 @@
-# plattform-akamai-influxdb
+# akamai-datastream-influxdb
 
 Program to fetch aggregate data from Akamai datastream and add it to influxdb.
 
@@ -21,6 +21,6 @@ To run the program needs the following environment variables set
 
 ## Running in kubernetes
 
-See [k8s-deployment-example.yaml].  You need to fill in credentials in the 
+See [./k8s-deployment-example.yaml](./k8s-deployment-example.yaml).  You need to fill in credentials in the 
 secret, as well as replace ```INFLUXDB_HOST``` and ```STREAMS``` environment
 values.
