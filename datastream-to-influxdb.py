@@ -103,15 +103,9 @@ class DataStream:
         self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname)
 
         if self.wait is not None:
-            if now < self.wait_time:
-                return True
-            else:
-                return False
+            return now < self.wait_time
 
-        if (now - self.end).seconds < 300:
-            return True
-        else:
-            return False
+        return (now - self.end).seconds < 300
 
     def get_metrics(self):
         metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
