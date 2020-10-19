@@ -57,6 +57,7 @@ def get_log():
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
+        # avoid other modules from logging too much
         level=logging.WARN,
     )
     logging.getLogger("__main__").setLevel(log_level)
