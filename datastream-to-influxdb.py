@@ -57,68 +57,118 @@ def get_log():
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=log_level,
+        # avoid other modules from logging too much
+        level=logging.WARN,
     )
+    logging.getLogger("__main__").setLevel(log_level)
 
     log = structlog.get_logger()
     return log
 
+class DataStream:
+    def __init__(self, session, log, influx_client, datastream_url, hostname):
+        self.session = session
+        self.log = log
+        self.influx_client = influx_client
+        self.datastream_url = datastream_url
+        self.hostname = hostname
+        self.start = datetime.datetime.utcnow() - datetime.timedelta(minutes=6)
+        self.end = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
+        self.wait = None
+        self.wait_time = None
+        self.retries = None
+        self.page_size = os.environ.get('PAGE_SIZE', '1000')
+        self.retry_no_content = os.environ.get('RETRY_204') is not None
 
-def get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries=2):
-    if retries <= 0:
-        return
-    metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
-    influxdb_data = []
-    page = 0
-    page_size = os.environ.get('PAGE_SIZE', 1000)
-    retry_no_content = os.environ.get('RETRY_204') is not None
-    done = False
-    while not done:
-        try:
-            result = session.get(datastream_url, params={
-                'start': start, 'end': end, 'page': page, 'size': page_size, 'aggregateMetric': metrics})
-        except Exception as e:
-            log.error("Error getting datastream data {}".format(
-                e), exc_info=True)
-            time.sleep((3 - retries) ** 2 * 5)
-            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-        if result.status_code == 204:
-            log.info("Got 204 no content for %s", hostname)
-            if retry_no_content:
-                time.sleep((3 - retries) ** 2 * 5)
-                return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-            else:
-                done = True
-        elif result.status_code != 200:
-            log.error("Error getting datastream data, got code {}, message: {}".format(result.status_code, result.text))
-            time.sleep((3 - retries) ** 2 * 5)
-            return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
+    def _update_retries(self):
+        if self.wait is None:
+            self.retries = 3
+            self.wait = 5
+            self.wait_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=5)
         else:
+            if self.retries > 0:
+                self.wait = self.wait * 3
+                self.wait_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=self.wait)
+                self.retries -= 1
+            else:
+                self.wait = None
+                self.retries = None
+                self._update_start_end()
+
+    def _update_start_end(self):
+        self.start = self.end
+        self.end = self.start + datetime.timedelta(minutes=1)
+
+    def should_wait(self):
+        now = datetime.datetime.utcnow()
+        self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname)
+
+        if self.wait is not None:
+            return now < self.wait_time
+
+        return (now - self.end).seconds < 300
+
+    def get_metrics(self):
+        metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
+        influxdb_data = []
+        page = 0
+        done = False
+        while not done:
             try:
-                data = result.json()
+                fetch_parameters={
+                    'start': self.start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    'end': self.end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    'page': page,
+                    'size': self.page_size,
+                    'aggregateMetric': metrics
+                    }
+                self.log.debug("Fetching data", datastream_url=self.datastream_url, params=fetch_parameters, hostname=self.hostname)
+                result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=42)
             except Exception as e:
-                log.error("Error decoding json data, status code {}, got '{}'".format(result.status_code, result.text))
-                return get_metrics(log, start, end, session, influx_client, datastream_url, hostname, retries - 1)
-            for entry in data['data']:
-                m = {}
-                m['tags'] = {'hostname': hostname}
-                m['measurement'] = 'aggregate'
-                m['time'] = entry['startTime']
-                m['fields'] = {}
-                for measurement in metrics.split(','):
-                    if measurement in entry:
-                        m['fields'][measurement] = entry[measurement]
-                influxdb_data.append(m)
-            try:
-                if not influx_client.write_points(influxdb_data):
-                    log.error("Error writing to influxdb")
-                    return
-            except Exception as e:
-                log.error("Error writing to influxdb: {}".format(e), exc_info=True)
+                self.log.error("Error getting datastream data %s", e, exc_info=True, hostname=self.hostname)
+                self._update_retries()
                 return
-            page += 1
-            if page >= data['metadata']['pageCount']:
-                done = True
+            if result.status_code == 204:
+                self.log.info("Got 204 no content", body=result.text, hostname=self.hostname)
+                if self.retry_no_content:
+                    self._update_retries()
+                    return
+                else:
+                    done = True
+            elif result.status_code != 200:
+                self.log.error("Error getting datastream data", status_code=result.status_code, return_text=result.text, hostname=self.hostname)
+                self._update_retries()
+                return
+            else:
+                self.log.debug("got data, size %d", len(result.content), status_code=result.status_code, hostname=self.hostname)
+                try:
+                    data = result.json()
+                except Exception as e:
+                    self.log.error("Error decoding json data", status_code=result.status_code, return_text=result.text, hostname=self.hostname)
+                    self._update_retries()
+                    return
+                for entry in data['data']:
+                    m = {}
+                    m['tags'] = {'hostname': self.hostname}
+                    m['measurement'] = 'aggregate'
+                    m['time'] = entry['startTime']
+                    m['fields'] = {}
+                    for measurement in metrics.split(','):
+                        if measurement in entry:
+                            m['fields'][measurement] = entry[measurement]
+                    influxdb_data.append(m)
+                try:
+                    if not self.influx_client.write_points(influxdb_data):
+                        self.log.error("Error writing to influxdb", hostname=self.hostname)
+                        return
+                except Exception as e:
+                    self.log.error("Error writing to influxdb", exc_info=True)
+                    return
+                page += 1
+                if page >= data['metadata']['pageCount']:
+                    done = True
+
+        self._update_start_end()
 
 
 def setup():
@@ -153,24 +203,18 @@ def get_datastreams():
 
 
 def main(log, session, influx_client):
-    start = datetime.datetime.utcnow() - datetime.timedelta(minutes=2)
-    end = datetime.datetime.utcnow() - datetime.timedelta(minutes=1)
+    datastreams = []
+    for datastream_url, hostname in get_datastreams():
+        datastreams.append(DataStream(session, log, influx_client, datastream_url, hostname))
     while True:
-        start_time = start.strftime("%Y-%m-%dT%H:%M:%SZ")
-        end_time = end.strftime("%Y-%m-%dT%H:%M:%SZ")
-        for datastream_url, hostname in get_datastreams():
-            log.info("Fetching logs for {} start={} end={}".format(hostname,
-                                                                   start_time, end_time))
-            get_metrics(log, start_time, end_time,
-                        session, influx_client,
-                        datastream_url, hostname)
-        start = end
-        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
-        if(end < start):
-            time.sleep(300 + (start-end).seconds)
-        elif((end-start).seconds < 300):
-            time.sleep(300-(end-start).seconds)
-        end = datetime.datetime.utcnow() - datetime.timedelta(minutes=5)
+        start = datetime.datetime.utcnow()
+        for datastream in datastreams:
+            if not datastream.should_wait():
+                datastream.get_metrics()
+
+        now = datetime.datetime.utcnow()
+        if (now - start).seconds < 60:
+            time.sleep((now - start).seconds)
 
 
 if __name__ == "__main__":
