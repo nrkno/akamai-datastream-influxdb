@@ -110,8 +110,13 @@ class DataStream:
         if self.wait is not None:
             return now < self.wait_time
 
-        # only query of we are at least 5 minutes from end time
-        return not(now > self.end and (now - self.end).seconds >= 300)
+        # if end time is after now, we must wait
+        if now < self.end:
+            return True
+        # if end time is at least 5 minutes before now, we can proceed
+        if (now - self.end).seconds >= 300:
+            return False
+        return True
 
     def get_metrics(self):
         metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
