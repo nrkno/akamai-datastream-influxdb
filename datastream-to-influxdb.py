@@ -98,6 +98,11 @@ class DataStream:
     def _update_start_end(self):
         self.start = self.end
         self.end = self.start + datetime.timedelta(minutes=1)
+        now = datetime.datetime.utcnow()
+        # query at earliest 5 minutes ago for end time
+        if self.end > now or (now - self.end).seconds < 300:
+            self.wait = 1
+            self.wait_time = self.end + datetime.timedelta(minutes=5)
 
     def should_wait(self):
         now = datetime.datetime.utcnow()
