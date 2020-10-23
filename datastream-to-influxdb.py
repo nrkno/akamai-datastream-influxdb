@@ -105,13 +105,18 @@ class DataStream:
 
     def should_wait(self):
         now = datetime.datetime.utcnow()
-        self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname)
+        self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname, wait_time=self.wait_time, start=self.start.isoformat(), end=self.end.isoformat())
 
         if self.wait is not None:
             return now < self.wait_time
 
-        # only query of we are at least 5 minutes from end time
-        return now > self.end and (now - self.end).seconds >= 300
+        # if end time is after now, we must wait
+        if now < self.end:
+            return True
+        # if end time is at least 5 minutes before now, we can proceed
+        if (now - self.end).seconds >= 300:
+            return False
+        return True
 
     def get_metrics(self):
         metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
@@ -219,7 +224,7 @@ def main(log, session, influx_client):
 
         now = datetime.datetime.utcnow()
         if (now - start).seconds < 60:
-            time.sleep((now - start).seconds)
+            time.sleep(60 - (now - start).seconds)
 
 
 if __name__ == "__main__":
