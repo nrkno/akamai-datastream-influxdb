@@ -99,10 +99,9 @@ class DataStream:
         self.start = self.end
         self.end = self.start + datetime.timedelta(minutes=1)
         now = datetime.datetime.utcnow()
-        # query at earliest 5 minutes ago for end time
-        if self.end > now or (now - self.end).seconds < 300:
-            self.wait = 1
-            self.wait_time = self.end + datetime.timedelta(minutes=5)
+        # reset wait on update
+        self.wait = None
+        self.retries = None
 
     def should_wait(self):
         now = datetime.datetime.utcnow()
@@ -111,7 +110,8 @@ class DataStream:
         if self.wait is not None:
             return now < self.wait_time
 
-        return (now - self.end).seconds < 300
+        # only query of we are at least 5 minutes from end time
+        return now > self.end and (now - self.end).seconds >= 300
 
     def get_metrics(self):
         metrics = '2xx,3xx,4xx,5xx,edgeResponseTime,originResponseTime,requestsPerSecond,bytesPerSecond,numCacheHit,numCacheMiss,offloadRate'
