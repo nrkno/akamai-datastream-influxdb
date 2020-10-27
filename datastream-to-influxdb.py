@@ -97,8 +97,14 @@ class DataStream:
 
     def _update_start_end(self):
         self.start = self.end
-        self.end = self.start + datetime.timedelta(minutes=1)
         now = datetime.datetime.utcnow()
+        # if we have gotten far behind because of retries and failures
+        if (now - self.start).seconds > 1800:
+            self.end = self.start + datetime.timedelta(minutes=10)
+        elif (now - self.start).seconds > 600:
+            self.end = self.start + datetime.timedelta(minutes=5)
+        else:
+            self.end = self.start + datetime.timedelta(minutes=1)
         # reset wait on update
         self.wait = None
         self.retries = None
@@ -132,8 +138,11 @@ class DataStream:
                     'size': self.page_size,
                     'aggregateMetric': metrics
                     }
+                timeout = 30
+                if self.retries is not None:
+                    timeout += (3 - retries) * 30
                 self.log.debug("Fetching data", datastream_url=self.datastream_url, params=fetch_parameters, hostname=self.hostname)
-                result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=42)
+                result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=timeout)
             except Exception as e:
                 self.log.error("Error getting datastream data %s", e, exc_info=True, hostname=self.hostname)
                 self._update_retries()
