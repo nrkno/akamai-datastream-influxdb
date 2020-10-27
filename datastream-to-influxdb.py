@@ -232,8 +232,10 @@ def main(log, session, influx_client):
                 datastream.get_metrics()
 
         now = datetime.datetime.utcnow()
-        if (now - start).seconds < 60:
-            time.sleep(60 - (now - start).seconds)
+        # make sure we wait a bit between each run
+        # in case all streams waits
+        if (now - start).seconds < 5:
+            time.sleep(5)
 
 
 if __name__ == "__main__":
