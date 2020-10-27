@@ -140,7 +140,7 @@ class DataStream:
                     }
                 timeout = 30
                 if self.retries is not None:
-                    timeout += (3 - retries) * 30
+                    timeout += (3 - self.retries) * 30
                 self.log.debug("Fetching data", datastream_url=self.datastream_url, params=fetch_parameters, hostname=self.hostname)
                 result = self.session.get(self.datastream_url, params=fetch_parameters, timeout=timeout)
             except Exception as e:
