@@ -91,6 +91,7 @@ class DataStream:
                 self.wait_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=self.wait)
                 self.retries -= 1
             else:
+                self.log.warning("too many retries, giving up", hostname=self.hostname, start=self.start.isoformat(), end=self.end.isoformat())
                 self.wait = None
                 self.retries = None
                 self._update_start_end()
@@ -111,7 +112,7 @@ class DataStream:
 
     def should_wait(self):
         now = datetime.datetime.utcnow()
-        self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname, wait_time=self.wait_time, start=self.start.isoformat(), end=self.end.isoformat())
+        self.log.debug("checking wait", wait=self.wait, retries=self.retries, hostname=self.hostname, wait_time=self.wait_time.isoformat(), start=self.start.isoformat(), end=self.end.isoformat())
 
         if self.wait is not None:
             return now < self.wait_time
